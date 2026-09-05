@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LINEスタンプ 申請前チェッカー</title>
+<style>
+  :root {
+    --bg: #f7f5f2;
+    --panel: #ffffff;
+    --border: #e2ded8;
+    --text: #2b2b2b;
+    --muted: #767267;
+    --accent: #06c755; /* LINE green */
+    --accent-dark: #049c43;
+    --ok: #1f9d55;
+    --ok-bg: #eafaf1;
+    --warn: #b8860b;
+    --warn-bg: #fff8e1;
+    --ng: #d0392b;
+    --ng-bg: #fdecea;
+    --locked: #9a948a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  header {
+    background: linear-gradient(135deg, #06c755, #049c43);
+    color: #fff;
+    padding: 32px 20px 26px;
+    text-align: center;
+  }
+  header h1 { margin: 0 0 8px; font-size: 1.6rem; }
+  header p { margin: 0; opacity: .92; font-size: .95rem; }
+  .disclaimer {
+    max-width: 760px;
+    margin: 18px auto 0;
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.4);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: .82rem;
+  }
+  main { max-width: 780px; margin: 0 auto; padding: 24px 16px 60px; }
+  section.card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  section.card h2 {
+    margin: 0 0 4px;
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  section.card .desc { color: var(--muted); font-size: .85rem; margin: 0 0 14px; }
+  .badge {
+    display: inline-block;
+    font-size: .7rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #eee;
+    color: var(--muted);
+    font-weight: bold;
+  }
+  .badge.pro { background: #fff1cc; color: #8a6100; }
+
+  #dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  #dropzone.drag { border-color: var(--accent); background: var(--ok-bg); }
+  #dropzone input { display: none; }
+  #dropzone .hint { font-size: .78rem; margin-top: 6px; }
+
+  .file-limit-note { font-size: .78rem; color: var(--muted); margin-top: 8px; }
+
+  #results { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .result-item {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .result-item .thumb {
+    width: 52px; height: 52px; flex: none;
+    background-repeat: repeat;
+    background-size: 8px 8px;
+    background-image: linear-gradient(45deg, #ddd 25%, transparent 25%),
+      linear-gradient(-45deg, #ddd 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #ddd 75%),
+      linear-gradient(-45deg, transparent 75%, #ddd 75%);
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .result-item .thumb img { width: 100%; height: 100%; object-fit: contain; }
+  .result-item .body { flex: 1; min-width: 0; }
+  .result-item .fname { font-size: .82rem; font-weight: bold; word-break: break-all; }
+  .checklines { margin: 6px 0 0; padding: 0; list-style: none; font-size: .82rem; }
+  .checklines li { margin: 2px 0; display: flex; gap: 6px; align-items: flex-start; }
+  .dot { flex: none; width: 9px; height: 9px; border-radius: 50%; margin-top: 5px; }
+  .dot.ok { background: var(--ok); }
+  .dot.warn { background: var(--warn); }
+  .dot.ng { background: var(--ng); }
+
+  .summary-bar {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px;
+    font-size: .85rem;
+  }
+  .summary-bar span {
+    padding: 4px 10px; border-radius: 999px; font-weight: bold;
+  }
+  .summary-bar .s-ok { background: var(--ok-bg); color: var(--ok); }
+  .summary-bar .s-warn { background: var(--warn-bg); color: var(--warn); }
+  .summary-bar .s-ng { background: var(--ng-bg); color: var(--ng); }
+
+  label.field { display: block; margin-bottom: 14px; }
+  label.field .lbl { font-size: .85rem; font-weight: bold; display: flex; justify-content: space-between; }
+  label.field .lbl .count { font-weight: normal; color: var(--muted); }
+  label.field .lbl .count.over { color: var(--ng); font-weight: bold; }
+  label.field input, label.field textarea {
+    width: 100%; margin-top: 5px; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: .9rem; font-family: inherit; background: #fffdfa;
+  }
+  label.field textarea { resize: vertical; min-height: 56px; }
+  .text-warn { font-size: .78rem; color: var(--ng); margin-top: 4px; }
+
+  .checklist-group { margin-bottom: 18px; }
+  .checklist-group h3 { font-size: .92rem; margin: 0 0 8px; color: var(--text); }
+  .checklist-group h3 .n { color: var(--muted); font-weight: normal; font-size: .78rem; }
+  .check-row {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 8px 0; border-bottom: 1px dashed var(--border);
+    font-size: .85rem;
+  }
+  .check-row:last-child { border-bottom: none; }
+  .check-row input[type=checkbox] { margin-top: 4px; flex: none; width: 16px; height: 16px; }
+  .check-row .source { display: block; font-size: .72rem; color: var(--muted); margin-top: 2px; }
+
+  .locked-panel {
+    border: 1px dashed var(--locked);
+    border-radius: 10px;
+    padding: 18px;
+    text-align: center;
+    color: var(--muted);
+    background: #fafaf8;
+  }
+  .locked-panel .feat-list { text-align: left; max-width: 420px; margin: 12px auto; font-size: .85rem; padding-left: 1.2em; }
+  .buy-btn {
+    display: inline-block; margin-top: 10px;
+    background: var(--accent); color: #fff; font-weight: bold;
+    padding: 10px 22px; border-radius: 999px; text-decoration: none;
+    font-size: .9rem;
+  }
+  .buy-btn:hover { background: var(--accent-dark); }
+
+  footer {
+    max-width: 780px; margin: 0 auto; padding: 0 16px 40px;
+    font-size: .76rem; color: var(--muted);
+  }
+  footer .updated { font-weight: bold; }
+  footer a { color: var(--muted); }
+  .btn-secondary {
+    background: #fff; border: 1px solid var(--border); color: var(--text);
+    padding: 8px 14px; border-radius: 8px; font-size: .82rem; cursor: pointer;
+  }
+  .btn-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .official-links { font-size: .78rem; margin-top: 8px; }
+  .official-links a { color: var(--accent-dark); }
+
+  .history-item {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: .84rem;
+  }
+  .history-item .h-meta { color: var(--muted); font-size: .76rem; }
+  .history-item .h-del { background: none; border: none; color: var(--ng); cursor: pointer; font-size: .8rem; }
+
+  @media print {
+    header .disclaimer, #dropzone, .file-limit-note, .btn-row,
+    #pdf-section, #pro-section, .buy-btn, #history-section .btn-row,
+    label.field input, label.field textarea { }
+    body { background: #fff; }
+    header { background: #06c755 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    #dropzone, .file-limit-note, .btn-row, #pdfBtn, #saveHistoryBtn, #historyLabelInput { display: none !important; }
+    section.card { break-inside: avoid; border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>LINEスタンプ 申請前チェッカー</h1>
+  <p>審査に出す前に、仕様不備と「見落としがちな落とし穴」をまとめてセルフチェック</p>
+  <div class="disclaimer">
+    ⚠️ このツールは<strong>LINE公式の審査に通ることを保証するものではありません</strong>。
+    画像仕様・文字数など機械的に確認できる項目のみを自動チェックし、著作権・表現内容などは
+    チェックリストによる自己診断の補助に留まります。最終判断は必ず
+    <a href="https://creator.line.me/ja/review_guideline/" target="_blank" rel="noopener" style="color:#fff;">LINE公式の審査ガイドライン</a>
+    でご確認ください。
+  </div>
+</header>
+
+<main>
+
+  <section class="card">
+    <h2>① 画像チェック <span class="badge" id="edition-badge-1">FREE版: 1枚ずつ</span></h2>
+    <p class="desc">スタンプ画像(PNG)をドラッグ&ドロップ、またはクリックして選択してください。サイズ・形式・透過・ファイルサイズを自動チェックします。</p>
+    <div id="dropzone">
+      <div>ここに画像をドロップ / クリックして選択</div>
+      <div class="hint">PNG形式のみ対応・複数選択可</div>
+      <input type="file" id="fileInput" accept="image/png" multiple>
+    </div>
+    <div class="file-limit-note" id="fileLimitNote"></div>
+    <div id="summaryBar" class="summary-bar" style="display:none;"></div>
+    <div id="results"></div>
+  </section>
+
+  <section class="card">
+    <h2>② テキストチェック</h2>
+    <p class="desc">クリエイター名・タイトル・説明文・コピーライトの文字数と、告知・URL等のNGパターンをチェックします(全角は2文字としてカウント)。</p>
+
+    <label class="field">
+      <span class="lbl"><span>クリエイター名</span><span class="count" id="cnt-creator">0 / 50</span></span>
+      <input type="text" id="in-creator" placeholder="例) uuhai0625">
+    </label>
+    <label class="field">
+      <span class="lbl"><span>スタンプタイトル</span><span class="count" id="cnt-title">0 / 40</span></span>
+      <input type="text" id="in-title" placeholder="例) くたお 毒舌あるある">
+    </label>
+    <label class="field">
+      <span class="lbl"><span>説明文</span><span class="count" id="cnt-desc">0 / 160</span></span>
+      <textarea id="in-desc" placeholder="スタンプの説明文を入力してください"></textarea>
+    </label>
+    <label class="field">
+      <span class="lbl"><span>コピーライト表記(半角英数字のみ)</span><span class="count" id="cnt-copy">0 / 50</span></span>
+      <input type="text" id="in-copy" placeholder="例) uuhai0625">
+    </label>
+    <div id="textWarnings"></div>
+  </section>
+
+  <section class="card">
+    <h2>③ 実体験ベースの独自チェックリスト <span class="badge">経験則</span></h2>
+    <p class="desc">
+      公式ガイドラインには明記されていないが、実際にLINEスタンプを複数シリーズ(くたお・権三郎・あつまろ等)申請してきた中で
+      発覚した落とし穴を反映したチェックリストです。全項目、自己診断形式でチェックしてください。
+    </p>
+
+    <div class="checklist-group">
+      <h3>🔍 このプロジェクトで実際に踏んだ落とし穴 <span class="n">(3件)</span></h3>
+      <div id="checklist-experience"></div>
+    </div>
+
+    <div class="checklist-group">
+      <h3>📘 公式ガイドライン準拠チェック(5カテゴリ準拠) <span class="n">(6項目)</span></h3>
+      <div id="checklist-official"></div>
+    </div>
+
+    <div class="official-links">
+      参照: <a href="https://creator.line.me/ja/review_guideline/" target="_blank" rel="noopener">LINE Creators Market 審査ガイドライン</a> /
+      <a href="https://note.com/line_cm/n/n2bba15ca3151" target="_blank" rel="noopener">公式note「審査に通らないスタンプの特徴」</a>
+    </div>
+  </section>
+
+  <section class="card" id="pro-section">
+    <h2>④ 一括診断・PDFレポート・volume履歴管理 <span class="badge pro">買い切り版</span></h2>
+    <div class="locked-panel" id="lockedPanel">
+      <p>買い切り版(ダウンロード購入)では、以下の機能が使えます:</p>
+      <ul class="feat-list">
+        <li>8〜40枚まとめて一括アップロード・一括診断</li>
+        <li>チェック結果のPDFレポート出力(申請前の社内チェック記録として保存可)</li>
+        <li>複数volume・複数シリーズの履歴管理(前回申請からの差分・テイスト一貫性の記録)</li>
+        <li>NGワード・告知文言・URLパターンの正規表現一括スキャン</li>
+      </ul>
+      <a class="buy-btn" href="#" id="buyLink">買い切り版を見る(BOOTH)</a>
+    </div>
+  </section>
+
+  <section class="card" id="pdf-section" style="display:none;">
+    <h2>④ PDFレポート出力</h2>
+    <p class="desc">診断結果・チェックリストの回答状況を、申請前チェック記録としてPDF保存できます(ブラウザの印刷機能を使用、外部送信なし)。</p>
+    <button class="btn-secondary" id="pdfBtn">現在の診断結果をPDF出力(印刷ダイアログを開く)</button>
+  </section>
+
+  <section class="card" id="history-section" style="display:none;">
+    <h2>⑤ volume履歴管理</h2>
+    <p class="desc">volumeやシリーズごとに診断結果を保存し、前回との差分・テイストの一貫性を記録できます(このブラウザ内にのみ保存されます)。</p>
+    <div class="btn-row" style="margin-top:0;">
+      <input type="text" id="historyLabelInput" placeholder="例) くたおVol.3" style="flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-size:.85rem;">
+      <button class="btn-secondary" id="saveHistoryBtn">現在の結果を保存</button>
+    </div>
+    <div id="historyList" style="margin-top:14px;"></div>
+  </section>
+
+  <div class="btn-row">
+    <button class="btn-secondary" id="resetBtn">入力内容をリセット</button>
+  </div>
+
+</main>
+
+<footer>
+  <p><span class="updated">最終更新: 2026年9月1日時点のLINE公式ガイドラインを基準に作成。</span>
+  LINE側の審査基準は予告なく変更される場合があります。本ツールの判定は目安であり、必ず公式ガイドラインと併せてご確認ください。</p>
+  <p>本ツールは完全にブラウザ内で動作し、アップロードした画像・入力したテキストはどこにも送信されません(開発者ツールのネットワークタブで通信が発生しないことをご確認いただけます)。</p>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // ============ 版の切り替え ============
+  // free: 無料デモ版(1枚ずつ診断、チェックリストは閲覧のみ)
+  // full: 買い切り完全版(一括診断・PDF出力・履歴管理を有効化)
+  var EDITION = "free";
+
+  var MAX_FREE_FILES = EDITION === "full" ? 40 : 1;
+
+  // ============ LINE公式仕様値 ============
+  var SPEC = {
+    stampMaxW: 370, stampMaxH: 320,
+    mainW: 240, mainH: 240,
+    tabW: 96, tabH: 74,
+    maxFileBytes: 1024 * 1024, // 1MB/枚
+    maxZipBytes: 60 * 1024 * 1024, // 60MB/ZIP全体
+    validCounts: [8, 16, 24, 32, 40],
+    minDpi: 72
+  };
+
+  var LIMITS = {
+    creator: 50,
+    title: 40,
+    desc: 160,
+    copyright: 50
+  };
+
+  // 経験則チェックリスト(このプロジェクトの実体験ベース)
+  var EXPERIENCE_CHECKS = [
+    {
+      id: "device-detail",
+      label: "スマホ・タブレット等の電子機器を小道具にしている場合、ホームボタン・カメラ配置・ロゴ等「実機を想起させる細部」が描き込まれていないか確認した",
+      source: "実例: あつまろVol.2で丸いホームボタンの描写により審査ガイドライン5.4(権利者許諾)で不合格になった。生成AIは同じキャラでも描写がブレるため、コマごとに確認が必要。"
+    },
+    {
+      id: "taste-category",
+      label: "申請時の「テイストカテゴリ」設定が、スタンプの内容(世界観・トーン)と実際に一致しているか確認した",
+      source: "実例: 毒舌・あるある系の内容にもかかわらず「挨拶」カテゴリのまま申請してしまい、LINEストアのカテゴリ閲覧から発見されなくなっていた。新規流入に直結するため優先度が高い。"
+    },
+    {
+      id: "ai-disclosure",
+      label: "生成AIで制作した場合、申請フォームの「AI画像生成ツールを使用した」チェックボックスにチェックを入れる準備ができている",
+      source: "2025年6月よりLINE側でAI生成スタンプの開示が義務化されている。チェック漏れは規約違反リスクになるため必須項目。"
+    }
+  ];
+
+  // 公式ガイドライン5カテゴリの自己診断項目(自動判定不可、チェックリスト形式)
+  var OFFICIAL_CHECKS = [
+    { id: "ip", label: "実在するロゴ・キャラクター・商品パッケージ・著名人の写真・二次創作等、権利者の許諾を証明できないものが写り込んでいないか" },
+    { id: "moral", label: "暴力・性的表現・過度な肌の露出・差別的表現・宗教/政治への攻撃・自殺自傷を誘引する表現が含まれていないか(子ども・動物のイラストも対象)" },
+    { id: "business", label: "個人情報の要求、企業広告、他社メッセンジャーアプリ名の言及、政治・宗教団体の勧誘に該当する内容が含まれていないか" },
+    { id: "text-only", label: "文字・数字・記号・ロゴのみの画像(表情やポーズを伴わないもの)になっていないか" },
+    { id: "promo", label: "日付告知・SNSフォロー誘導・URL/QRコード等、販促目的の要素が含まれていないか(販促はスタンプ本体でなくSNS投稿側で行う)" },
+    { id: "duplicate", label: "過去に申請したスタンプ・他のクリエイターの構図と酷似していないか(複製とみなされるリスク)" }
+  ];
+
+  function renderChecklist(container, items) {
+    container.innerHTML = "";
+    items.forEach(function (item) {
+      var row = document.createElement("label");
+      row.className = "check-row";
+      var src = item.source ? '<span class="source">' + escapeHtml(item.source) + "</span>" : "";
+      row.innerHTML =
+        '<input type="checkbox" data-check-id="' + item.id + '">' +
+        "<span>" + escapeHtml(item.label) + src + "</span>";
+      container.appendChild(row);
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  renderChecklist(document.getElementById("checklist-experience"), EXPERIENCE_CHECKS);
+  renderChecklist(document.getElementById("checklist-official"), OFFICIAL_CHECKS);
+
+  // ============ 画像チェック ============
+  var dropzone = document.getElementById("dropzone");
+  var fileInput = document.getElementById("fileInput");
+  var resultsEl = document.getElementById("results");
+  var summaryBar = document.getElementById("summaryBar");
+  var fileLimitNote = document.getElementById("fileLimitNote");
+
+  fileLimitNote.textContent = EDITION === "full"
+    ? "買い切り版: 最大40枚まで一括診断できます。"
+    : "無料版では1枚のみ診断できます。まとめて診断したい場合は買い切り版をご利用ください。";
+
+  document.getElementById("edition-badge-1").textContent =
+    EDITION === "full" ? "買い切り版: 一括診断 有効" : "FREE版: 1枚ずつ";
+
+  if (EDITION === "full") {
+    document.getElementById("pro-section").style.display = "none";
+    document.getElementById("pdf-section").style.display = "block";
+    document.getElementById("history-section").style.display = "block";
+  }
+
+  // ============ PDFレポート出力(買い切り版) ============
+  var pdfBtn = document.getElementById("pdfBtn");
+  if (pdfBtn) {
+    pdfBtn.addEventListener("click", function () {
+      window.print();
+    });
+  }
+
+  // ============ volume履歴管理(買い切り版、localStorage完結) ============
+  var HISTORY_KEY = "line_checker_history_v1";
+
+  function loadHistory() {
+    try {
+      return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveHistoryList(list) {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+  }
+
+  function renderHistoryList() {
+    var listEl = document.getElementById("historyList");
+    if (!listEl) return;
+    var list = loadHistory();
+    if (!list.length) {
+      listEl.innerHTML = '<p class="desc" style="margin:0;">まだ保存された履歴はありません。</p>';
+      return;
+    }
+    listEl.innerHTML = "";
+    list.slice().reverse().forEach(function (entry) {
+      var row = document.createElement("div");
+      row.className = "history-item";
+      var date = new Date(entry.savedAt);
+      var dateStr = date.getFullYear() + "/" + (date.getMonth() + 1) + "/" + date.getDate() +
+        " " + String(date.getHours()).padStart(2, "0") + ":" + String(date.getMinutes()).padStart(2, "0");
+      row.innerHTML =
+        "<div><strong>" + escapeHtml(entry.label) + "</strong>" +
+        '<div class="h-meta">' + dateStr + " ・ 合格" + entry.summary.ok +
+        " / 要確認" + entry.summary.warn + " / 不合格" + entry.summary.ng +
+        " ・ チェックリスト " + entry.checklistChecked + "/" + entry.checklistTotal + "項目 完了</div></div>";
+      var delBtn = document.createElement("button");
+      delBtn.className = "h-del";
+      delBtn.textContent = "削除";
+      delBtn.addEventListener("click", function () {
+        if (!confirm("「" + entry.label + "」の履歴を削除しますか?")) return;
+        var updated = loadHistory().filter(function (e) { return e.id !== entry.id; });
+        saveHistoryList(updated);
+        renderHistoryList();
+      });
+      row.appendChild(delBtn);
+      listEl.appendChild(row);
+    });
+  }
+
+  var saveHistoryBtn = document.getElementById("saveHistoryBtn");
+  if (saveHistoryBtn) {
+    saveHistoryBtn.addEventListener("click", function () {
+      var label = document.getElementById("historyLabelInput").value.trim();
+      if (!label) {
+        alert("volume名・シリーズ名を入力してください(例: くたおVol.3)");
+        return;
+      }
+      var checkedBoxes = document.querySelectorAll('input[type=checkbox][data-check-id]:checked').length;
+      var totalBoxes = document.querySelectorAll('input[type=checkbox][data-check-id]').length;
+      var entry = {
+        id: Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+        label: label,
+        savedAt: Date.now(),
+        summary: lastSummaryCounts || { ok: 0, warn: 0, ng: 0 },
+        checklistChecked: checkedBoxes,
+        checklistTotal: totalBoxes
+      };
+      var list = loadHistory();
+      list.push(entry);
+      saveHistoryList(list);
+      document.getElementById("historyLabelInput").value = "";
+      renderHistoryList();
+    });
+    renderHistoryList();
+  }
+
+  dropzone.addEventListener("click", function () { fileInput.click(); });
+  ["dragenter", "dragover"].forEach(function (ev) {
+    dropzone.addEventListener(ev, function (e) {
+      e.preventDefault();
+      dropzone.classList.add("drag");
+    });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    dropzone.addEventListener(ev, function (e) {
+      e.preventDefault();
+      dropzone.classList.remove("drag");
+    });
+  });
+  dropzone.addEventListener("drop", function (e) {
+    handleFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener("change", function (e) {
+    handleFiles(e.target.files);
+  });
+
+  function handleFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList).filter(function (f) {
+      return f.type === "image/png" || /\.png$/i.test(f.name);
+    });
+    if (!files.length) return;
+
+    if (files.length > MAX_FREE_FILES) {
+      files = files.slice(0, MAX_FREE_FILES);
+      alert(
+        EDITION === "full"
+          ? "一度に診断できるのは40枚までです。"
+          : "無料版では1枚のみ診断できます。2枚目以降は買い切り版でご利用ください(先頭の1枚のみ診断します)。"
+      );
+    }
+
+    resultsEl.innerHTML = "";
+    var counts = { ok: 0, warn: 0, ng: 0 };
+
+    var pending = files.length;
+    files.forEach(function (file) {
+      analyzeImage(file, function (checks) {
+        renderResult(file, checks);
+        checks.forEach(function (c) { counts[c.level]++; });
+        pending--;
+        if (pending === 0) renderSummary(counts);
+      });
+    });
+  }
+
+  function analyzeImage(file, cb) {
+    var checks = [];
+
+    // ファイルサイズ
+    if (file.size > SPEC.maxFileBytes) {
+      checks.push({ level: "ng", text: "ファイルサイズが1MBを超えています(" + (file.size / 1024 / 1024).toFixed(2) + "MB)" });
+    } else {
+      checks.push({ level: "ok", text: "ファイルサイズOK(" + (file.size / 1024).toFixed(0) + "KB)" });
+    }
+
+    // 拡張子/MIME
+    if (file.type && file.type !== "image/png") {
+      checks.push({ level: "ng", text: "PNG形式ではありません(" + file.type + ")" });
+    }
+
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var buf = new Uint8Array(e.target.result);
+      var isPngSignature =
+        buf.length > 8 &&
+        buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+      checks.push({
+        level: isPngSignature ? "ok" : "ng",
+        text: isPngSignature ? "PNGシグネチャを確認" : "PNGファイルとして認識できません(壊れている可能性)"
+      });
+
+      var blob = new Blob([buf], { type: "image/png" });
+      var url = URL.createObjectURL(blob);
+      var img = new Image();
+      img.onload = function () {
+        var w = img.naturalWidth, h = img.naturalHeight;
+
+        // サイズ判定(メイン240x240 / タブ96x74 / スタンプ370x320以内、を推定して案内)
+        if (w === SPEC.mainW && h === SPEC.mainH) {
+          checks.push({ level: "ok", text: "サイズ " + w + "×" + h + "px(メイン画像規定サイズと一致)" });
+        } else if (w === SPEC.tabW && h === SPEC.tabH) {
+          checks.push({ level: "ok", text: "サイズ " + w + "×" + h + "px(タブ画像規定サイズと一致)" });
+        } else if (w <= SPEC.stampMaxW && h <= SPEC.stampMaxH) {
+          checks.push({ level: "ok", text: "サイズ " + w + "×" + h + "px(スタンプ画像の上限370×320px以内)" });
+        } else {
+          checks.push({
+            level: "ng",
+            text: "サイズ " + w + "×" + h + "px が規定を超えています(スタンプは370×320px以内、メインは240×240px、タブは96×74px)"
+          });
+        }
+
+        // 偶数ピクセル
+        if (w % 2 !== 0 || h % 2 !== 0) {
+          checks.push({ level: "warn", text: "画像サイズが奇数ピクセルです(偶数サイズが推奨されています)" });
+        }
+
+        // 透過・余白チェック(canvasでアルファチャンネルをサンプリング、1回のgetImageDataで両方判定)
+        var canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0);
+        try {
+          var data = ctx.getImageData(0, 0, w, h).data;
+          var hasTransparentPixel = false;
+          var cornerAlpha = data[3]; // 左上ピクセルのアルファ
+          for (var i = 3; i < data.length; i += 4 * Math.max(1, Math.floor(data.length / 4 / 4000))) {
+            if (data[i] < 250) { hasTransparentPixel = true; break; }
+          }
+          if (cornerAlpha < 250 && hasTransparentPixel) {
+            checks.push({ level: "ok", text: "背景が透過されています" });
+          } else if (!hasTransparentPixel) {
+            checks.push({ level: "ng", text: "透過ピクセルが検出できません(背景が透過されていない可能性)" });
+          } else {
+            checks.push({ level: "warn", text: "四隅は不透明ですが、画像内に透過部分があります。背景全体が透過されているかご確認ください" });
+          }
+
+          // 余白の簡易チェック(外周10pxに不透明ピクセルがどれだけあるか、上で取得済みのdataを再利用)
+          var margin = 10;
+          var edgeOpaqueCount = 0, edgeSampled = 0;
+          for (var y = 0; y < h; y += Math.max(1, Math.floor(h / 60))) {
+            for (var x = 0; x < w; x += Math.max(1, Math.floor(w / 60))) {
+              var nearEdge = x < margin || y < margin || x > w - margin || y > h - margin;
+              if (nearEdge) {
+                edgeSampled++;
+                var idx = (y * w + x) * 4 + 3;
+                if (data[idx] > 40) edgeOpaqueCount++;
+              }
+            }
+          }
+          if (edgeSampled > 0 && edgeOpaqueCount / edgeSampled > 0.15) {
+            checks.push({ level: "warn", text: "画像端(余白目安10px以内)にキャラクターがはみ出している可能性があります" });
+          }
+        } catch (err) {
+          checks.push({ level: "warn", text: "透過・余白チェックを実行できませんでした(ブラウザ制限)" });
+        }
+
+        URL.revokeObjectURL(url);
+        cb(checks);
+      };
+      img.onerror = function () {
+        checks.push({ level: "ng", text: "画像を読み込めませんでした" });
+        cb(checks);
+      };
+      img.src = url;
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function renderResult(file, checks) {
+    var item = document.createElement("div");
+    item.className = "result-item";
+
+    var thumb = document.createElement("div");
+    thumb.className = "thumb";
+    var img = document.createElement("img");
+    img.src = URL.createObjectURL(file);
+    thumb.appendChild(img);
+
+    var body = document.createElement("div");
+    body.className = "body";
+    var fname = document.createElement("div");
+    fname.className = "fname";
+    fname.textContent = file.name;
+    body.appendChild(fname);
+
+    var ul = document.createElement("ul");
+    ul.className = "checklines";
+    checks.forEach(function (c) {
+      var li = document.createElement("li");
+      var dot = document.createElement("span");
+      dot.className = "dot " + c.level;
+      var span = document.createElement("span");
+      span.textContent = c.text;
+      li.appendChild(dot);
+      li.appendChild(span);
+      ul.appendChild(li);
+    });
+    body.appendChild(ul);
+
+    item.appendChild(thumb);
+    item.appendChild(body);
+    resultsEl.appendChild(item);
+  }
+
+  var lastSummaryCounts = null;
+
+  function renderSummary(counts) {
+    lastSummaryCounts = counts;
+    summaryBar.style.display = "flex";
+    summaryBar.innerHTML =
+      '<span class="s-ok">合格 ' + counts.ok + "</span>" +
+      '<span class="s-warn">要確認 ' + counts.warn + "</span>" +
+      '<span class="s-ng">不合格の可能性 ' + counts.ng + "</span>";
+  }
+
+  // ============ テキストチェック ============
+  function isFullWidth(ch) {
+    var code = ch.codePointAt(0);
+    // 半角英数字・半角記号・半角カナ以外はおおむね全角扱いとする簡易判定
+    if (code <= 0x007e) return false; // ASCII
+    if (code >= 0xff61 && code <= 0xff9f) return false; // 半角カナ
+    return true;
+  }
+
+  function countWeighted(str) {
+    var total = 0;
+    for (var i = 0; i < str.length; i++) {
+      total += isFullWidth(str[i]) ? 2 : 1;
+    }
+    return total;
+  }
+
+  function wireCounter(inputId, countId, limit) {
+    var input = document.getElementById(inputId);
+    var countEl = document.getElementById(countId);
+    input.addEventListener("input", function () {
+      var n = countWeighted(input.value);
+      countEl.textContent = n + " / " + limit;
+      countEl.classList.toggle("over", n > limit);
+    });
+  }
+
+  wireCounter("in-creator", "cnt-creator", LIMITS.creator);
+  wireCounter("in-title", "cnt-title", LIMITS.title);
+  wireCounter("in-desc", "cnt-desc", LIMITS.desc);
+  wireCounter("in-copy", "cnt-copy", LIMITS.copyright);
+
+  // コピーライトは半角英数字のみ
+  document.getElementById("in-copy").addEventListener("blur", function () {
+    var warnEl = document.getElementById("textWarnings");
+    warnEl.innerHTML = "";
+    if (/[^\x20-\x7e]/.test(this.value) && this.value.length > 0) {
+      var w = document.createElement("div");
+      w.className = "text-warn";
+      w.textContent = "⚠️ コピーライト表記は半角英数字のみ使用可能です(全角文字が含まれています)";
+      warnEl.appendChild(w);
+    }
+  });
+
+  // NGワード・URL・告知文言の簡易正規表現チェック
+  var NG_PATTERNS = [
+    { re: /https?:\/\/|www\./i, msg: "URLらしき文字列が含まれています(URL記載はNG)" },
+    { re: /フォロー|拡散希望|RT希望|いいね(お願い|求む)/i, msg: "SNS拡散・フォロー誘導とみなされる可能性のある文言が含まれています" },
+    { re: /LINE@|Twitter|X\(旧Twitter\)|Instagram|インスタ|TikTok/i, msg: "他社サービス名・メッセンジャーアプリ名への言及が含まれています" },
+    { re: /電話番号|住所|メールアドレス|@[\w.-]+\.[a-z]{2,}/i, msg: "個人情報の記載・要求とみなされる可能性のある文言が含まれています" }
+  ];
+
+  function checkNGText() {
+    var warnEl = document.getElementById("textWarnings");
+    var combined = [
+      document.getElementById("in-title").value,
+      document.getElementById("in-desc").value
+    ].join(" ");
+    var found = NG_PATTERNS.filter(function (p) { return p.re.test(combined); });
+    var existing = warnEl.querySelectorAll(".ng-pattern-warn");
+    existing.forEach(function (el) { el.remove(); });
+    found.forEach(function (p) {
+      var w = document.createElement("div");
+      w.className = "text-warn ng-pattern-warn";
+      w.textContent = "⚠️ " + p.msg;
+      warnEl.appendChild(w);
+    });
+  }
+  ["in-title", "in-desc"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", checkNGText);
+  });
+
+  // ============ リセット ============
+  document.getElementById("resetBtn").addEventListener("click", function () {
+    if (!confirm("入力内容と診断結果をリセットしますか?")) return;
+    ["in-creator", "in-title", "in-desc", "in-copy"].forEach(function (id) {
+      document.getElementById(id).value = "";
+      document.getElementById(id).dispatchEvent(new Event("input"));
+    });
+    document.getElementById("textWarnings").innerHTML = "";
+    resultsEl.innerHTML = "";
+    summaryBar.style.display = "none";
+    fileInput.value = "";
+    document.querySelectorAll('input[type=checkbox][data-check-id]').forEach(function (cb) {
+      cb.checked = false;
+    });
+  });
+
+})();
+</script>
+</body>
+</html>
