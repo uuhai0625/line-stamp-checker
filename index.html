@@ -68,7 +68,7 @@
     padding: 2px 8px;
     border-radius: 999px;
     background: #eee;
-    color: var(--muted);
+    color: #4a4a4a;
     font-weight: bold;
   }
   .badge.pro { background: #fff1cc; color: #8a6100; }
@@ -189,18 +189,16 @@
     border: 1px solid var(--border); border-radius: 8px;
     padding: 10px 12px; margin-bottom: 8px;
     display: flex; justify-content: space-between; align-items: center;
-    font-size: .84rem;
+    font-size: .84rem; word-break: break-all;
   }
   .history-item .h-meta { color: var(--muted); font-size: .76rem; }
   .history-item .h-del { background: none; border: none; color: var(--ng); cursor: pointer; font-size: .8rem; }
 
   @media print {
-    header .disclaimer, #dropzone, .file-limit-note, .btn-row,
-    #pdf-section, #pro-section, .buy-btn, #history-section .btn-row,
-    label.field input, label.field textarea { }
     body { background: #fff; }
     header { background: #06c755 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    #dropzone, .file-limit-note, .btn-row, #pdfBtn, #saveHistoryBtn, #historyLabelInput { display: none !important; }
+    header .disclaimer, #dropzone, .file-limit-note, .btn-row, #pdfBtn, #saveHistoryBtn,
+    #historyLabelInput, #pdf-section, #pro-section, .buy-btn, #history-section .btn-row { display: none !important; }
     section.card { break-inside: avoid; border: 1px solid #ccc; }
   }
 </style>
@@ -224,7 +222,7 @@
   <section class="card">
     <h2>① 画像チェック <span class="badge" id="edition-badge-1">FREE版: 1枚ずつ</span></h2>
     <p class="desc">スタンプ画像(PNG)をドラッグ&ドロップ、またはクリックして選択してください。サイズ・形式・透過・ファイルサイズを自動チェックします。</p>
-    <div id="dropzone">
+    <div id="dropzone" tabindex="0" role="button" aria-label="画像をドロップまたはクリックして選択">
       <div>ここに画像をドロップ / クリックして選択</div>
       <div class="hint">PNG形式のみ対応・複数選択可</div>
       <input type="file" id="fileInput" accept="image/png" multiple>
@@ -304,6 +302,7 @@
     <h2>⑤ volume履歴管理</h2>
     <p class="desc">volumeやシリーズごとに診断結果を保存し、前回との差分・テイストの一貫性を記録できます(このブラウザ内にのみ保存されます)。</p>
     <div class="btn-row" style="margin-top:0;">
+      <label for="historyLabelInput" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">volume名</label>
       <input type="text" id="historyLabelInput" placeholder="例) くたおVol.3" style="flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-size:.85rem;">
       <button class="btn-secondary" id="saveHistoryBtn">現在の結果を保存</button>
     </div>
@@ -442,7 +441,8 @@
   }
 
   function saveHistoryList(list) {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list)); }
+    catch (e) { alert("保存に失敗しました(ブラウザの保存容量やプライベートブラウジング設定をご確認ください)。"); }
   }
 
   function renderHistoryList() {
@@ -455,27 +455,31 @@
     }
     listEl.innerHTML = "";
     list.slice().reverse().forEach(function (entry) {
+      try {
       var row = document.createElement("div");
       row.className = "history-item";
-      var date = new Date(entry.savedAt);
+      var date = new Date(entry.savedAt || Date.now());
       var dateStr = date.getFullYear() + "/" + (date.getMonth() + 1) + "/" + date.getDate() +
         " " + String(date.getHours()).padStart(2, "0") + ":" + String(date.getMinutes()).padStart(2, "0");
+      var summary = entry.summary || {};
+      var label = entry.label || "(名称未設定)";
       row.innerHTML =
-        "<div><strong>" + escapeHtml(entry.label) + "</strong>" +
-        '<div class="h-meta">' + dateStr + " ・ 合格" + entry.summary.ok +
-        " / 要確認" + entry.summary.warn + " / 不合格" + entry.summary.ng +
-        " ・ チェックリスト " + entry.checklistChecked + "/" + entry.checklistTotal + "項目 完了</div></div>";
+        "<div><strong>" + escapeHtml(label) + "</strong>" +
+        '<div class="h-meta">' + dateStr + " ・ 合格" + (summary.ok || 0) +
+        " / 要確認" + (summary.warn || 0) + " / 不合格" + (summary.ng || 0) +
+        " ・ チェックリスト " + (entry.checklistChecked || 0) + "/" + (entry.checklistTotal || 0) + "項目 完了</div></div>";
       var delBtn = document.createElement("button");
       delBtn.className = "h-del";
       delBtn.textContent = "削除";
       delBtn.addEventListener("click", function () {
-        if (!confirm("「" + entry.label + "」の履歴を削除しますか?")) return;
+        if (!confirm("「" + label + "」の履歴を削除しますか?")) return;
         var updated = loadHistory().filter(function (e) { return e.id !== entry.id; });
         saveHistoryList(updated);
         renderHistoryList();
       });
       row.appendChild(delBtn);
       listEl.appendChild(row);
+      } catch (e) { /* 壊れた履歴データはスキップ */ }
     });
   }
 
@@ -507,6 +511,9 @@
   }
 
   dropzone.addEventListener("click", function () { fileInput.click(); });
+  dropzone.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
+  });
   ["dragenter", "dragover"].forEach(function (ev) {
     dropzone.addEventListener(ev, function (e) {
       e.preventDefault();
@@ -655,6 +662,10 @@
       };
       img.src = url;
     };
+    reader.onerror = function () {
+      checks.push({ level: "ng", text: "ファイルの読み込みに失敗しました(破損している、または読み取り権限がない可能性)" });
+      cb(checks);
+    };
     reader.readAsArrayBuffer(file);
   }
 
@@ -666,6 +677,7 @@
     thumb.className = "thumb";
     var img = document.createElement("img");
     img.src = URL.createObjectURL(file);
+    img.alt = file.name;
     thumb.appendChild(img);
 
     var body = document.createElement("div");
@@ -716,8 +728,9 @@
 
   function countWeighted(str) {
     var total = 0;
-    for (var i = 0; i < str.length; i++) {
-      total += isFullWidth(str[i]) ? 2 : 1;
+    var chars = Array.from(str || ""); // サロゲートペア(絵文字等)を1文字として正しく分割
+    for (var i = 0; i < chars.length; i++) {
+      total += isFullWidth(chars[i]) ? 2 : 1;
     }
     return total;
   }
